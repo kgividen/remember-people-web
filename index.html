@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.github.com; img-src data:">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#0b7285">
+<title>Remember People</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-alt: #f4f5f7;
+    --text: #1a1c1e;
+    --text-dim: #6b7280;
+    --accent: #0b7285;
+    --accent-text: #ffffff;
+    --border: #e2e4e8;
+    --danger: #c0392b;
+    --ok: #2f9e44;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #131518;
+      --bg-alt: #1d2025;
+      --text: #e8eaed;
+      --text-dim: #9aa0a8;
+      --accent: #3bc9db;
+      --accent-text: #10262b;
+      --border: #2c3037;
+      --danger: #ff6b5b;
+      --ok: #69db7c;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  header {
+    position: sticky; top: 0; z-index: 10;
+    padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .hdr-row { display: flex; align-items: center; gap: 8px; }
+  header h1 { font-size: 18px; flex: 1; font-weight: 650; }
+  header .hdr-row button {
+    background: none; border: none; font-size: 20px; line-height: 1;
+    color: var(--accent); cursor: pointer; padding: 6px;
+  }
+  header .hdr-row button.on {
+    background: var(--accent); color: var(--accent-text); border-radius: 8px;
+  }
+  main { max-width: 640px; margin: 0 auto; padding: 12px 14px calc(40px + var(--tagbar-h, 0px)); }
+  .hidden { display: none !important; }
+
+  #status {
+    font-size: 12px; color: var(--text-dim); text-align: center;
+    padding: 4px 14px; min-height: 20px;
+  }
+  #status.error { color: var(--danger); }
+
+  input, textarea {
+    width: 100%; font: inherit; color: var(--text);
+    background: var(--bg-alt); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px;
+  }
+  input:focus, textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  label { display: block; font-size: 13px; color: var(--text-dim); margin: 14px 0 4px; }
+  textarea { min-height: 72px; resize: vertical; }
+
+  .btn {
+    display: inline-block; font: inherit; font-weight: 600;
+    border: none; border-radius: 8px; padding: 11px 18px;
+    cursor: pointer; background: var(--bg-alt); color: var(--text);
+  }
+  .btn.primary { background: var(--accent); color: var(--accent-text); }
+  .btn.danger { background: none; color: var(--danger); }
+  .btn-row { display: flex; gap: 10px; margin-top: 22px; }
+  .btn-row .spacer { flex: 1; }
+
+  #search-wrap { position: relative; margin: 2px 0 10px; }
+  #search { padding-right: 38px; }
+  #search::-webkit-search-cancel-button { display: none; } /* we provide our own */
+  #search-clear {
+    position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+    border: none; background: none; color: var(--text-dim);
+    font-size: 15px; line-height: 1; padding: 8px 10px; cursor: pointer;
+  }
+
+  #people { padding-right: 16px; } /* room for the A-Z rail */
+  .sec-h {
+    position: sticky; top: var(--header-h, 54px); z-index: 5;
+    background: var(--bg);
+    font-size: 13px; font-weight: 700; color: var(--text-dim);
+    padding: 6px 4px 4px; border-bottom: 1px solid var(--border);
+  }
+  .person-row {
+    display: flex; flex-direction: column; gap: 1px;
+    padding: 10px 4px; border-bottom: 1px solid var(--border);
+    cursor: pointer;
+  }
+  .person-row .name { font-weight: 400; }
+  .person-row .name b { font-weight: 650; }
+  .person-row .sub { font-size: 12.5px; color: var(--text-dim); }
+  #empty { text-align: center; color: var(--text-dim); padding: 40px 0; }
+
+  #azrail {
+    position: fixed; right: 0; top: 50%; transform: translateY(-50%);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 4px 2px 4px 8px; z-index: 20;
+    font-size: 11px; font-weight: 600; color: var(--accent);
+    touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  #azrail span { padding: 0 6px; line-height: 1.4; cursor: pointer; pointer-events: none; }
+  #azrail span.hot {
+    color: var(--accent-text); background: var(--accent); border-radius: 7px;
+  }
+  #railhud {
+    position: fixed; right: 48px; top: 50%; transform: translateY(-50%);
+    z-index: 30; width: 64px; height: 64px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px; font-weight: 700;
+    background: var(--bg-alt); color: var(--accent);
+    box-shadow: 0 2px 14px rgba(0, 0, 0, 0.3);
+  }
+
+  #filterbar {
+    display: flex; gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    padding: 10px 0 2px;
+  }
+  .chip {
+    font: inherit; font-size: 13px; font-weight: 600;
+    border: 1px solid var(--border); border-radius: 999px;
+    background: var(--bg-alt); color: var(--text);
+    padding: 5px 12px; cursor: pointer; white-space: nowrap;
+  }
+  .chip.on {
+    background: var(--accent); color: var(--accent-text); border-color: transparent;
+  }
+  .pid { font-size: 12px; color: var(--text-dim); align-self: center; margin-left: auto; }
+
+  .quick-actions { display: flex; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
+  .quick-actions a {
+    font-size: 14px; font-weight: 600; text-decoration: none;
+    color: var(--accent); background: var(--bg-alt);
+    border-radius: 8px; padding: 8px 14px;
+  }
+
+  .detail-name { font-size: 22px; font-weight: 700; margin: 6px 0 10px; }
+  .drow { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .drow .dlabel { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 2px; }
+  .drow .dvalue { white-space: pre-wrap; word-break: break-word; }
+  .drow a { color: var(--accent); text-decoration: none; display: block; padding: 2px 0; }
+
+  .note { font-size: 13px; color: var(--text-dim); margin-top: 6px; line-height: 1.5; }
+  .setup-intro { font-size: 14px; line-height: 1.6; color: var(--text-dim); margin-bottom: 6px; }
+
+  /* Select mode: check circles on rows, bulk-tag bar pinned to the bottom */
+  #people.sel-mode .person-row { position: relative; padding-left: 36px; }
+  #people.sel-mode .person-row::before {
+    content: ''; position: absolute; left: 6px; top: 50%;
+    transform: translateY(-50%); width: 19px; height: 19px;
+    border-radius: 50%; border: 1.5px solid var(--text-dim);
+    font-size: 13px; line-height: 19px; text-align: center;
+  }
+  #people.sel-mode .person-row.checked::before {
+    content: '\2713'; background: var(--accent); color: var(--accent-text);
+    border-color: var(--accent);
+  }
+  #tagbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    background: var(--bg); border-top: 1px solid var(--border);
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .tagbar-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .tagbar-row .spacer { flex: 1; }
+  #tag-chips:empty { display: none; }
+  #sel-count { font-size: 13px; font-weight: 650; color: var(--text-dim); }
+  #tag-new { flex: 1; min-width: 110px; max-width: 220px; padding: 8px 10px; }
+  #tag-hint { flex: 1; margin: 0; }
+  #btn-tag-add, #btn-tag-remove { padding: 8px 14px; white-space: nowrap; }
+  /* Rows that already carry the chosen tag get a badge while selecting. */
+  #people.sel-mode .person-row.has-cur::after {
+    content: attr(data-cur); position: absolute; right: 4px; top: 50%;
+    transform: translateY(-50%);
+    background: var(--accent); color: var(--accent-text);
+    border-radius: 999px; padding: 3px 9px;
+    font-size: 11px; font-weight: 700;
+  }
+
+  /* Desktop (wide windows): Contacts-style split view — the list pane stays
+     on the left, detail/edit fills the right. Phone layout is untouched. */
+  #detail-placeholder { display: none; }
+  @media (min-width: 760px) {
+    .hdr-row, #filterbar { max-width: 1060px; margin-left: auto; margin-right: auto; }
+    main {
+      display: grid; grid-template-columns: 320px minmax(0, 1fr);
+      column-gap: 44px; max-width: 1060px;
+      height: calc(100vh - var(--chrome-h, 86px) - var(--tagbar-h, 0px));
+      padding: 0 14px;
+    }
+    .tagbar-row { max-width: 1032px; margin: 0 auto; width: 100%; }
+    #view-list { grid-column: 1; grid-row: 1; }
+    #view-detail, #view-edit, #detail-placeholder { grid-column: 2; grid-row: 1; }
+    #view-list, #view-detail, #view-edit { overflow-y: auto; height: 100%; padding: 12px 4px 40px; }
+    #view-setup {
+      grid-column: 1 / -1; width: 100%; max-width: 560px; margin: 0 auto;
+      overflow-y: auto; height: 100%; padding: 12px 0 40px;
+    }
+    #detail-placeholder:not(.hidden) {
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-dim);
+    }
+    /* The list pane scrolls itself: pin search at its top and stack the
+       sticky section headers just below it. */
+    #search-wrap { position: sticky; top: 0; z-index: 6; background: var(--bg); margin: 0; padding: 2px 0 10px; }
+    .sec-h { top: var(--search-h, 53px); }
+    .person-row { border-radius: 8px; padding: 10px 8px; }
+    .person-row:hover, .person-row.sel { background: var(--bg-alt); }
+    #btn-back { display: none; } /* the list is always visible beside the detail */
+    /* Scale the A-Z rail and its HUD up from thumb-size to desktop-size. */
+    #azrail { font-size: 13px; cursor: pointer; }
+    #azrail span { padding: 0 8px; line-height: 1.7; }
+    #railhud {
+      width: 110px; height: 110px; border-radius: 22px; font-size: 60px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header id="hdr">
+  <div class="hdr-row">
+    <h1 id="title">Remember People</h1>
+    <button id="btn-select" title="Select people" aria-label="Select people">&#9745;</button>
+    <button id="btn-filter" title="Filter by tag" aria-label="Filter by tag">#</button>
+    <button id="btn-sync" title="Sync" aria-label="Sync">&#8635;</button>
+    <button id="btn-add" title="Add person" aria-label="Add person">&#65291;</button>
+    <button id="btn-settings" title="Settings" aria-label="Settings">&#9881;</button>
+  </div>
+  <div id="filterbar" class="hidden"></div>
+</header>
+<div id="status"></div>
+
+<main>
+  <!-- Setup / settings -->
+  <section id="view-setup" class="hidden">
+    <p class="setup-intro">
+      Connect to the private GitHub repo that holds your contacts file.
+      Use a fine-grained personal access token scoped to only that repo,
+      with Contents read &amp; write permission.
+    </p>
+    <label for="cfg-repo">Repository (owner/name)</label>
+    <input id="cfg-repo" placeholder="kgividen/rp-data" autocapitalize="none" autocorrect="off">
+    <label for="cfg-branch">Branch</label>
+    <input id="cfg-branch" placeholder="main" autocapitalize="none" autocorrect="off">
+    <label for="cfg-path">File path</label>
+    <input id="cfg-path" placeholder="data.json" autocapitalize="none" autocorrect="off">
+    <label for="cfg-token">Access token</label>
+    <input id="cfg-token" type="password" placeholder="github_pat_..." autocapitalize="none" autocorrect="off">
+    <p class="note">The token is stored only in this browser's local storage and is sent only to api.github.com.</p>
+    <p class="note" id="version-note"></p>
+    <div class="btn-row">
+      <button class="btn primary" id="btn-connect">Connect</button>
+      <button class="btn hidden" id="btn-setup-cancel">Cancel</button>
+      <span class="spacer"></span>
+      <button class="btn danger hidden" id="btn-forget">Forget this device</button>
+    </div>
+  </section>
+
+  <!-- List -->
+  <section id="view-list" class="hidden">
+    <div id="search-wrap">
+      <input id="search" type="search" placeholder="Search people" autocapitalize="none">
+      <button id="search-clear" class="hidden" aria-label="Clear search">&#10005;</button>
+    </div>
+    <div id="people"></div>
+    <p id="empty" class="hidden">No people yet. Tap &#65291; to add someone.</p>
+    <div id="azrail" class="hidden"></div>
+    <div id="railhud" class="hidden"></div>
+  </section>
+
+  <!-- Desktop split view only: fills the right pane when nothing is open -->
+  <div id="detail-placeholder" class="hidden">Select a person</div>
+
+  <!-- Detail (read-only) -->
+  <section id="view-detail" class="hidden">
+    <div id="detail-name" class="detail-name"></div>
+    <div class="quick-actions" id="detail-actions"></div>
+    <div id="detail-fields"></div>
+    <div class="btn-row">
+      <button class="btn primary" id="btn-edit">Edit</button>
+      <button class="btn" id="btn-back">Back</button>
+    </div>
+  </section>
+
+  <!-- Add / edit -->
+  <section id="view-edit" class="hidden">
+    <label for="f-first">First name</label>
+    <input id="f-first" autocomplete="off">
+    <label for="f-last">Last name</label>
+    <input id="f-last" autocomplete="off">
+    <label for="f-nickname">Nickname</label>
+    <input id="f-nickname" autocomplete="off">
+    <label for="f-email">Emails (comma separated)</label>
+    <input id="f-email" inputmode="email" autocapitalize="none" autocomplete="off">
+    <label for="f-mobile">Mobile phones (comma separated)</label>
+    <input id="f-mobile" inputmode="tel" autocomplete="off">
+    <label for="f-phone">Home phones (comma separated)</label>
+    <input id="f-phone" inputmode="tel" autocomplete="off">
+    <label for="f-company">Company</label>
+    <input id="f-company" autocomplete="off">
+    <label for="f-description">Description</label>
+    <input id="f-description" autocomplete="off">
+    <label for="f-notes">Notes</label>
+    <textarea id="f-notes"></textarea>
+    <label for="f-tags">Tags (comma separated)</label>
+    <input id="f-tags" placeholder="friend, work" autocapitalize="none" autocomplete="off">
+    <div class="btn-row">
+      <button class="btn primary" id="btn-save">Save</button>
+      <button class="btn" id="btn-cancel">Cancel</button>
+      <span class="spacer"></span>
+      <button class="btn danger hidden" id="btn-delete">Delete</button>
+    </div>
+  </section>
+</main>
+
+<!-- Bulk-tag action bar, shown in select mode -->
+<div id="tagbar" class="hidden">
+  <div class="tagbar-row">
+    <span id="sel-count">0 selected</span>
+    <button class="chip" id="btn-sel-all">Select all</button>
+    <span class="spacer"></span>
+    <button class="chip" id="btn-sel-done">Done</button>
+  </div>
+  <div class="tagbar-row" id="tag-chips"></div>
+  <div class="tagbar-row">
+    <input id="tag-new" placeholder="Or type a new tag" autocapitalize="none" autocomplete="off">
+    <span id="tag-hint" class="note"></span>
+    <button class="chip hidden" id="btn-tag-rename">Rename&#8230;</button>
+    <button class="btn primary hidden" id="btn-tag-add"></button>
+    <button class="btn danger hidden" id="btn-tag-remove"></button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+const APP_VERSION = '2026-08-23.7';
+
+const LS_CONFIG = 'rp-config';
+const LS_CACHE = 'rp-cache';
+const MAX_SAVE_ATTEMPTS = 3;
+
+// Serialized key order matches the Go struct so both clients produce
+// identical JSON and repo diffs stay minimal.
+const KEY_ORDER = ['id', 'first_name', 'last_name', 'nickname', 'email', 'emails',
+                   'phone', 'phones', 'mobile', 'mobiles', 'company', 'description',
+                   'notes', 'tags', 'contact_id', 'contact_ids'];
+
+// Fold the legacy single-value fields (email, phone, mobile, contact_id)
+// into their list counterparts, mirroring the Go side's Normalize.
+function normalizePerson(p) {
+  const folds = [['email', 'emails'], ['phone', 'phones'],
+                 ['mobile', 'mobiles'], ['contact_id', 'contact_ids']];
+  for (const [legacy, list] of folds) {
+    if (p[legacy]) {
+      const values = p[list] || [];
+      if (!values.includes(p[legacy])) values.unshift(p[legacy]);
+      p[list] = values;
+      delete p[legacy];
+    }
+  }
+  return p;
+}
+
+let cfg = null;              // {repo, branch, path, token}
+let data = null;             // {next_id, people: [...]}
+let sha = null;              // blob SHA of the file as last fetched; null = doesn't exist yet
+let editingId = null;        // person id being edited, or null when adding
+const activeTags = new Set(); // lowercase tags currently filtered on (ANDed, like the CLI)
+
+const $ = id => document.getElementById(id);
+
+// Desktop split view: at wide widths the list stays visible beside the
+// detail/edit pane. The media query is the single source of truth; the test
+// harness has no matchMedia, so it falls through to phone behavior there.
+const desktopMQ = window.matchMedia?.('(min-width: 760px)') ?? { matches: false };
+
+// ---------- GitHub Contents API ----------
+
+function contentURL() {
+  return 'https://api.github.com/repos/' + cfg.repo + '/contents/' +
+         encodeURIComponent(cfg.path).replace(/%2F/g, '/');
+}
+
+async function gh(method, url, body) {
+  const resp = await fetch(url, {
+    method,
+    headers: {
+      'Authorization': 'Bearer ' + cfg.token,
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      ...(body ? { 'Content-Type': 'application/json' } : {})
+    },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  return resp;
+}
+
+function b64EncodeUtf8(s) {
+  const bytes = new TextEncoder().encode(s);
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
+function b64DecodeUtf8(b) {
+  const bin = atob(b.replace(/\s/g, ''));
+  const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+async function pull() {
+  const resp = await gh('GET', contentURL() + '?ref=' + encodeURIComponent(cfg.branch));
+  if (resp.status === 404) {
+    data = { next_id: 1, people: [] };
+    sha = null;
+    return;
+  }
+  if (resp.status === 401 || resp.status === 403) {
+    throw new Error('GitHub authentication failed — check the token\'s scope and expiry.');
+  }
+  if (!resp.ok) throw new Error('GitHub error ' + resp.status + ' while fetching.');
+  const file = await resp.json();
+  const raw = b64DecodeUtf8(file.content || '');
+  data = raw.trim() ? JSON.parse(raw) : { next_id: 1, people: [] };
+  if (!Array.isArray(data.people)) data.people = [];
+  if (!data.next_id) data.next_id = 1;
+  data.people.forEach(normalizePerson);
+  sha = file.sha;
+  localStorage.setItem(LS_CACHE, JSON.stringify(data));
+}
+
+function orderPerson(p) {
+  const out = {};
+  for (const k of KEY_ORDER) if (p[k] !== undefined) out[k] = p[k];
+  for (const k of Object.keys(p)) if (out[k] === undefined) out[k] = p[k];
+  return out;
+}
+
+function serialize() {
+  const doc = { next_id: data.next_id, people: data.people.map(orderPerson) };
+  return JSON.stringify(doc, null, 2) + '\n';
+}
+
+// Returns 'ok' or 'conflict'; throws on other failures.
+async function push(message) {
+  const payload = {
+    message,
+    content: b64EncodeUtf8(serialize()),
+    branch: cfg.branch
+  };
+  if (sha) payload.sha = sha;
+  const resp = await gh('PUT', contentURL(), payload);
+  if (resp.status === 409 || resp.status === 422) return 'conflict';
+  if (resp.status === 401 || resp.status === 403) {
+    throw new Error('GitHub authentication failed — check the token\'s scope and expiry.');
+  }
+  if (!resp.ok) throw new Error('GitHub error ' + resp.status + ' while saving.');
+  const result = await resp.json();
+  sha = result.content.sha;
+  localStorage.setItem(LS_CACHE, JSON.stringify(data));
+  return 'ok';
+}
+
+// Apply fn to the data and save with a SHA guard. On an upstream conflict,
+// re-fetch and re-apply so edits from other devices merge instead of being
+// clobbered — same semantics as the Go CLI.
+async function mutate(message, fn) {
+  for (let attempt = 0; attempt < MAX_SAVE_ATTEMPTS; attempt++) {
+    fn(data);
+    if (await push(message) === 'ok') return;
+    await pull();
+  }
+  throw new Error('Giving up after repeated conflicting updates — try again.');
+}
+
+// ---------- Views ----------
+
+let currentView = 'view-setup';
+
+function show(view) {
+  currentView = view;
+  if (view !== 'view-list' && selectMode) setSelectMode(false);
+  for (const v of ['view-setup', 'view-list', 'view-detail', 'view-edit']) {
+    $(v).classList.toggle('hidden', v !== view);
+  }
+  const listVisible = view === 'view-list' ||
+    (desktopMQ.matches && (view === 'view-detail' || view === 'view-edit'));
+  if (listVisible) $('view-list').classList.remove('hidden');
+  $('detail-placeholder').classList.toggle('hidden',
+    !(desktopMQ.matches && view === 'view-list'));
+  const inApp = view !== 'view-setup';
+  $('btn-add').classList.toggle('hidden', !inApp);
+  $('btn-sync').classList.toggle('hidden', !inApp);
+  $('btn-filter').classList.toggle('hidden', !listVisible);
+  $('btn-select').classList.toggle('hidden', !listVisible);
+  if (!listVisible) {
+    $('azrail').classList.add('hidden');
+    $('railhud').classList.add('hidden');
+    $('filterbar').classList.add('hidden');
+    setHeaderVar();
+  }
+  updateSelection();
+}
+
+// Highlight the open person's row in the desktop list pane.
+function updateSelection() {
+  const selId = !desktopMQ.matches ? null
+    : currentView === 'view-detail' ? detailId
+    : currentView === 'view-edit' ? editingId : null;
+  for (const row of document.querySelectorAll?.('.person-row') ?? []) {
+    row.classList.toggle('sel', Number(row.dataset.id) === selId);
+  }
+}
+
+function headerH() {
+  return $('hdr').offsetHeight || 54;
+}
+
+function setHeaderVar() {
+  const style = document.documentElement?.style;
+  if (!style) return;
+  style.setProperty('--header-h', headerH() + 'px');
+  // Desktop split view sizing: page chrome above the panes, and the sticky
+  // search box height that section headers stack under.
+  style.setProperty('--chrome-h', headerH() + ($('status').offsetHeight || 28) + 'px');
+  const searchH = $('search-wrap').offsetHeight;
+  if (searchH) style.setProperty('--search-h', searchH + 'px');
+  style.setProperty('--tagbar-h',
+    (selectMode ? $('tagbar').offsetHeight || 0 : 0) + 'px');
+  positionRail();
+}
+
+// The rail and HUD are position: fixed at the window's right edge (right for
+// the phone, where the list spans the screen). On desktop the list is a left
+// pane, so shift them to hug the pane's right edge instead.
+function positionRail() {
+  const rail = $('azrail'), hud = $('railhud');
+  if (!rail.style) return; // test harness has no style on stub elements
+  if (!desktopMQ.matches) {
+    rail.style.right = hud.style.right = '';
+    return;
+  }
+  const pane = $('view-list').getBoundingClientRect?.();
+  if (!pane || !pane.width) return;
+  const inset = window.innerWidth - pane.right;
+  rail.style.right = inset + 'px';
+  hud.style.right = (inset + (rail.offsetWidth || 32) + 12) + 'px';
+}
+
+function setStatus(msg, isError) {
+  const el = $('status');
+  el.textContent = msg || '';
+  el.classList.toggle('error', !!isError);
+}
+
+// The primary sort string doubles as the section letter, so groups stay
+// contiguous: last name, else company, else first name.
+function sortPrimary(p) {
+  return (p.last_name || p.company || p.first_name || '').toLowerCase();
+}
+
+function sortKey(p) {
+  return sortPrimary(p) + ' ' + (p.first_name || p.company || '').toLowerCase();
+}
+
+function letterFor(p) {
+  const c = sortPrimary(p).charAt(0).toUpperCase();
+  return c >= 'A' && c <= 'Z' ? c : '#';
+}
+
+function hasAllTags(p, tags) {
+  const own = (p.tags || []).map(t => t.toLowerCase());
+  return [...tags].every(t => own.includes(t));
+}
+
+function displayName(p) {
+  const name = [(p.first_name || ''), (p.last_name || '')].join(' ').trim();
+  return name || p.company || '(unnamed)';
+}
+
+function matchesQuery(p, q) {
+  const fields = [p.first_name, p.last_name, p.nickname, p.company, p.description,
+                  p.notes, ...(p.emails || []), ...(p.phones || []),
+                  ...(p.mobiles || []), ...(p.tags || [])];
+  return fields.some(f => (f || '').toLowerCase().includes(q));
+}
+
+function visiblePeople() {
+  const q = $('search').value.trim().toLowerCase();
+  return data.people
+    .filter(p => (!q || matchesQuery(p, q)) &&
+                 (activeTags.size === 0 || hasAllTags(p, activeTags)))
+    .sort((a, b) => sortKey(a) < sortKey(b) ? -1 : sortKey(a) > sortKey(b) ? 1 : 0);
+}
+
+// iPhone-style row: first name regular weight, last name (or company) bold.
+function personRow(p) {
+  const row = document.createElement('div');
+  row.className = 'person-row';
+  row.dataset.id = p.id;
+  const name = document.createElement('span');
+  name.className = 'name';
+  if (p.first_name || p.last_name) {
+    if (p.first_name) name.append(p.first_name + (p.last_name ? ' ' : ''));
+    if (p.last_name) {
+      const b = document.createElement('b');
+      b.textContent = p.last_name;
+      name.appendChild(b);
+    }
+    if (p.nickname) name.append(' (' + p.nickname + ')');
+  } else {
+    const b = document.createElement('b');
+    b.textContent = p.company || '(unnamed)';
+    name.appendChild(b);
+  }
+  row.appendChild(name);
+  const contact = (p.mobiles || [])[0] || (p.phones || [])[0] || (p.emails || [])[0];
+  const parts = [p.description || p.company, contact];
+  // While bulk-tagging, each row's tags matter more than its phone number.
+  if (selectMode && (p.tags || []).length) parts.push('#' + p.tags.join(' #'));
+  const subText = parts.filter(Boolean).join(' · ');
+  if (subText) {
+    const sub = document.createElement('span');
+    sub.className = 'sub';
+    sub.textContent = subText;
+    row.appendChild(sub);
+  }
+  if (selectMode && selected.has(p.id)) row.classList.add('checked');
+  if (selectMode && curTag && hasTag(p, curTag.toLowerCase())) {
+    row.classList.add('has-cur');
+    row.dataset.cur = curTag;
+  }
+  row.addEventListener('click', () => {
+    if (selectMode) toggleRowSel(p, row);
+    else openDetail(p.id);
+  });
+  return row;
+}
+
+function renderList() {
+  const people = visiblePeople();
+  const container = $('people');
+  container.textContent = '';
+
+  const sections = new Map();
+  for (const p of people) {
+    const letter = letterFor(p);
+    if (!sections.has(letter)) sections.set(letter, []);
+    sections.get(letter).push(p);
+  }
+
+  for (const [letter, group] of sections) {
+    const heading = document.createElement('div');
+    heading.className = 'sec-h';
+    heading.textContent = letter;
+    heading.id = 'sec-' + letter;
+    container.appendChild(heading);
+    for (const p of group) container.appendChild(personRow(p));
+  }
+
+  renderRail([...sections.keys()]);
+  updateSelection();
+  positionRail();
+  if (selectMode) renderTagbar();
+  const empty = $('empty');
+  empty.classList.toggle('hidden', people.length > 0);
+  empty.textContent = data.people.length === 0
+    ? 'No people yet. Tap + to add someone.'
+    : 'No matches.';
+}
+
+// ---------- A-Z rail ----------
+
+function renderRail(letters) {
+  const rail = $('azrail');
+  rail.textContent = '';
+  rail.classList.toggle('hidden', letters.length < 2);
+  for (const letter of letters) {
+    const s = document.createElement('span');
+    s.textContent = letter;
+    rail.appendChild(s);
+  }
+}
+
+// iPhone-style scrubber: press anywhere on the rail and slide; the list
+// follows the letter under your finger, with a HUD bubble for feedback.
+let railActive = false;
+let railLastLetter = null;
+
+function railSpanAt(clientY) {
+  const spans = [...$('azrail').children];
+  if (!spans.length) return null;
+  for (const s of spans) {
+    const r = s.getBoundingClientRect();
+    if (clientY >= r.top && clientY <= r.bottom) return s;
+  }
+  return clientY < spans[0].getBoundingClientRect().top
+    ? spans[0] : spans[spans.length - 1];
+}
+
+function railScrub(e) {
+  const span = railSpanAt(e.clientY);
+  if (!span) return;
+  const letter = span.textContent;
+
+  const hud = $('railhud');
+  hud.textContent = letter;
+  hud.classList.remove('hidden');
+  for (const s of $('azrail').children) s.classList.toggle('hot', s === span);
+
+  if (letter === railLastLetter) return;
+  railLastLetter = letter;
+  const heading = document.getElementById('sec-' + letter);
+  if (heading) {
+    // Anchor on the section's first row (a stuck sticky heading reports
+    // its pinned position, not its place in the flow) and scroll by the
+    // viewport-relative delta — absolute scroll positions are unreliable
+    // in iOS standalone mode once the page has been scrolled.
+    const row = heading.nextElementSibling || heading;
+    if (desktopMQ.matches) {
+      // Desktop: the list pane scrolls internally; land the row just
+      // below the pane's sticky search box.
+      const pane = $('view-list');
+      const target = pane.getBoundingClientRect().top +
+                     ($('search-wrap').offsetHeight || 0) + heading.offsetHeight;
+      pane.scrollTop += row.getBoundingClientRect().top - target;
+    } else {
+      const delta = row.getBoundingClientRect().top - headerH() - heading.offsetHeight;
+      window.scrollBy(0, delta);
+    }
+  }
+}
+
+function railStart(e) {
+  railActive = true;
+  $('azrail').setPointerCapture?.(e.pointerId);
+  railScrub(e);
+  e.preventDefault();
+}
+
+function railMove(e) {
+  if (!railActive) return;
+  railScrub(e);
+  e.preventDefault();
+}
+
+function railEnd() {
+  railActive = false;
+  railLastLetter = null;
+  $('railhud').classList.add('hidden');
+  for (const s of $('azrail').children) s.classList.remove('hot');
+}
+
+// ---------- Tag filter ----------
+
+function allTags() {
+  const seen = new Map(); // lowercase -> first-seen display casing
+  for (const p of data.people) {
+    for (const t of p.tags || []) {
+      const key = t.toLowerCase();
+      if (!seen.has(key)) seen.set(key, t);
+    }
+  }
+  return [...seen.entries()].sort((a, b) => a[0] < b[0] ? -1 : 1);
+}
+
+function renderFilterBar() {
+  const bar = $('filterbar');
+  bar.textContent = '';
+  for (const [key, label] of allTags()) {
+    const chip = document.createElement('button');
+    chip.className = 'chip' + (activeTags.has(key) ? ' on' : '');
+    chip.textContent = label;
+    chip.addEventListener('click', () => {
+      if (activeTags.has(key)) activeTags.delete(key);
+      else activeTags.add(key);
+      renderFilterBar();
+      renderList();
+    });
+    bar.appendChild(chip);
+  }
+  if (activeTags.size) {
+    const clear = document.createElement('button');
+    clear.className = 'chip';
+    clear.textContent = 'Clear';
+    clear.addEventListener('click', () => {
+      activeTags.clear();
+      renderFilterBar();
+      renderList();
+    });
+    bar.appendChild(clear);
+  }
+  $('btn-filter').classList.toggle('on', activeTags.size > 0);
+}
+
+function toggleFilterBar() {
+  const bar = $('filterbar');
+  const showing = bar.classList.contains('hidden');
+  bar.classList.toggle('hidden', !showing);
+  if (showing) renderFilterBar();
+  setHeaderVar();
+}
+
+function openList() {
+  show('view-list');
+  renderList();
+}
+
+// ---------- Select mode / bulk tagging ----------
+
+let selectMode = false;
+let curTag = '';               // the tag being worked with (chip or typed)
+const selected = new Set();    // person ids
+
+function setSelectMode(on) {
+  selectMode = on;
+  selected.clear();
+  curTag = '';
+  $('tag-new').value = '';
+  $('btn-select').classList.toggle('on', on);
+  $('tagbar').classList.toggle('hidden', !on);
+  $('people').classList.toggle('sel-mode', on);
+  if (on) show('view-list');
+  renderList();
+  setHeaderVar(); // --tagbar-h makes room for the bar
+}
+
+function toggleRowSel(p, row) {
+  if (selected.has(p.id)) selected.delete(p.id);
+  else selected.add(p.id);
+  row.classList.toggle('checked', selected.has(p.id));
+  renderTagbar();
+}
+
+function allVisibleSelected() {
+  const vis = visiblePeople();
+  return vis.length > 0 && vis.every(p => selected.has(p.id));
+}
+
+function hasTag(p, key) {
+  return (p.tags || []).some(t => t.toLowerCase() === key);
+}
+
+function renderTagbar() {
+  const n = selected.size;
+  $('sel-count').textContent = n + ' selected';
+  $('btn-sel-all').textContent = allVisibleSelected() ? 'Select none' : 'Select all';
+
+  // Chips pick the working tag (radio-style); tapping the active one clears it.
+  const curKey = curTag.toLowerCase();
+  const chips = $('tag-chips');
+  chips.textContent = '';
+  for (const [key, label] of allTags()) {
+    const chip = document.createElement('button');
+    chip.className = 'chip' + (key === curKey ? ' on' : '');
+    chip.textContent = label;
+    chip.addEventListener('click', () => {
+      curTag = key === curTag.toLowerCase() ? '' : label;
+      $('tag-new').value = '';
+      renderList(); // rows re-badge for the new tag
+    });
+    chips.appendChild(chip);
+  }
+
+  // The action buttons say exactly what one tap will do.
+  const addBtn = $('btn-tag-add'), rmBtn = $('btn-tag-remove'), hint = $('tag-hint');
+  let withTag = 0;
+  if (curTag && n > 0) {
+    withTag = data.people.filter(p => selected.has(p.id) && hasTag(p, curKey)).length;
+  }
+  const without = n - withTag;
+  addBtn.textContent = 'Add "' + curTag + '" to ' + without;
+  rmBtn.textContent = 'Remove from ' + withTag;
+  addBtn.classList.toggle('hidden', !curTag || n === 0 || without === 0);
+  rmBtn.classList.toggle('hidden', !curTag || n === 0 || withTag === 0);
+  // Renaming is tag-level (touches everyone with the tag), so it only needs
+  // an existing tag chosen, not a selection.
+  $('btn-tag-rename').classList.toggle('hidden',
+    !curTag || !allTags().some(([key]) => key === curKey));
+  hint.textContent = !curTag ? 'Pick a tag to work with ↑'
+    : n === 0 ? 'Now select people — a badge marks who already has "' + curTag + '"'
+    : '';
+}
+
+// Rename a tag on every person who has it, as a single commit. Also handles
+// pure casing changes ("Work" -> "work") and merges into an existing tag.
+async function renameTag(oldTag) {
+  const input = prompt('Rename tag "' + oldTag + '" to:', oldTag);
+  if (input === null) return;
+  const newTag = input.trim();
+  if (!newTag || newTag === oldTag) return;
+  const oldKey = oldTag.toLowerCase();
+  const count = data.people.filter(p => hasTag(p, oldKey)).length;
+  if (count === 0) {
+    setStatus('No people have that tag.');
+    return;
+  }
+  const noun = count === 1 ? 'person' : 'people';
+  if (!confirm('Rename "' + oldTag + '" to "' + newTag + '" for ' + count + ' ' + noun + '?')) return;
+  const newKey = newTag.toLowerCase();
+  setStatus('Saving…');
+  try {
+    await mutate('rp-web: rename tag ' + oldTag + ' to ' + newTag, d => {
+      for (const p of d.people) {
+        if (!hasTag(p, oldKey)) continue;
+        const rest = (p.tags || []).filter(t => t.toLowerCase() !== oldKey);
+        p.tags = rest.some(t => t.toLowerCase() === newKey) ? rest : [...rest, newTag];
+      }
+    });
+    if (activeTags.delete(oldKey)) activeTags.add(newKey);
+    curTag = newTag;
+    setStatus('Renamed "' + oldTag + '" to "' + newTag + '" on ' + count + ' ' + noun + '.');
+    renderList();
+  } catch (err) {
+    setStatus(err.message, true);
+  }
+}
+
+// Add or remove one tag on every selected person, as a single commit.
+async function applyTag(tag, tagRemove) {
+  tag = tag.trim();
+  if (!tag) return;
+  if (selected.size === 0) {
+    setStatus('No people selected.', true);
+    return;
+  }
+  const key = tag.toLowerCase();
+  const ids = [...selected];
+  const wouldChange = p => tagRemove ? hasTag(p, key) : !hasTag(p, key);
+  const count = data.people.filter(p => ids.includes(p.id) && wouldChange(p)).length;
+  if (count === 0) {
+    setStatus(tagRemove ? 'None of the selected people have that tag.'
+                        : 'All selected people already have that tag.');
+    return;
+  }
+  const noun = count === 1 ? 'person' : 'people';
+  setStatus('Saving…');
+  try {
+    const msg = tagRemove ? 'rp-web: remove tag ' + tag + ' from ' + count + ' ' + noun
+                          : 'rp-web: add tag ' + tag + ' to ' + count + ' ' + noun;
+    await mutate(msg, d => {
+      for (const id of ids) {
+        const p = d.people.find(x => x.id === id);
+        if (!p || !wouldChange(p)) continue;
+        if (tagRemove) {
+          p.tags = (p.tags || []).filter(t => t.toLowerCase() !== key);
+          if (!p.tags.length) delete p.tags;
+        } else {
+          p.tags = [...(p.tags || []), tag];
+        }
+      }
+    });
+    setStatus((tagRemove ? 'Removed "' + tag + '" from ' : 'Added "' + tag + '" to ') +
+              count + ' ' + noun + '.');
+    $('tag-new').value = '';
+    renderList(); // re-render keeps the selection for chaining another tag
+  } catch (err) {
+    setStatus(err.message, true);
+  }
+}
+
+function addQuickAction(container, label, href) {
+  const a = document.createElement('a');
+  a.textContent = label;
+  a.href = href;
+  container.appendChild(a);
+}
+
+// ---------- Detail (read-only) ----------
+
+let detailId = null;
+
+function addDetailRow(container, label, values, hrefFor) {
+  if (!values || !values.length) return;
+  const row = document.createElement('div');
+  row.className = 'drow';
+  const l = document.createElement('span');
+  l.className = 'dlabel';
+  l.textContent = label;
+  row.appendChild(l);
+  const v = document.createElement('div');
+  v.className = 'dvalue';
+  for (const value of values) {
+    if (hrefFor) {
+      const a = document.createElement('a');
+      a.href = hrefFor(value);
+      a.textContent = value;
+      v.appendChild(a);
+    } else {
+      v.append(value);
+    }
+  }
+  row.appendChild(v);
+  container.appendChild(row);
+}
+
+function openDetail(id) {
+  const p = data.people.find(x => x.id === id);
+  if (!p) {
+    openList();
+    return;
+  }
+  detailId = id;
+
+  $('detail-name').textContent = displayName(p) + (p.nickname ? ' (' + p.nickname + ')' : '');
+
+  const qa = $('detail-actions');
+  qa.textContent = '';
+  const tel = (p.mobiles || [])[0] || (p.phones || [])[0];
+  if (tel) {
+    addQuickAction(qa, 'Call', 'tel:' + tel);
+    addQuickAction(qa, 'Text', 'sms:' + tel);
+  }
+  const email = (p.emails || [])[0];
+  if (email) addQuickAction(qa, 'Email', 'mailto:' + email);
+  const pid = document.createElement('span');
+  pid.className = 'pid';
+  pid.textContent = 'ID ' + id;
+  qa.appendChild(pid);
+
+  const fields = $('detail-fields');
+  fields.textContent = '';
+  addDetailRow(fields, 'Mobile', p.mobiles, v => 'tel:' + v);
+  addDetailRow(fields, 'Home', p.phones, v => 'tel:' + v);
+  addDetailRow(fields, 'Email', p.emails, v => 'mailto:' + v);
+  addDetailRow(fields, 'Company', p.company ? [p.company] : null);
+  addDetailRow(fields, 'Description', p.description ? [p.description] : null);
+  addDetailRow(fields, 'Notes', p.notes ? [p.notes] : null);
+  addDetailRow(fields, 'Tags', p.tags && p.tags.length ? [p.tags.join(', ')] : null);
+
+  show('view-detail');
+  window.scrollTo(0, 0);
+  $('view-detail').scrollTop = 0;
+}
+
+function openEdit(id) {
+  editingId = id;
+  const p = id === null ? {} : data.people.find(x => x.id === id) || {};
+  $('f-first').value = p.first_name || '';
+  $('f-last').value = p.last_name || '';
+  $('f-nickname').value = p.nickname || '';
+  $('f-email').value = (p.emails || []).join(', ');
+  $('f-mobile').value = (p.mobiles || []).join(', ');
+  $('f-phone').value = (p.phones || []).join(', ');
+  $('f-company').value = p.company || '';
+  $('f-description').value = p.description || '';
+  $('f-notes').value = p.notes || '';
+  $('f-tags').value = (p.tags || []).join(', ');
+  $('btn-delete').classList.toggle('hidden', id === null);
+
+  show('view-edit');
+  window.scrollTo(0, 0);
+  $('view-edit').scrollTop = 0;
+}
+
+// ---------- Actions ----------
+
+function splitList(value) {
+  return value.split(',').map(v => v.trim()).filter(Boolean);
+}
+
+function readForm() {
+  return {
+    first_name: $('f-first').value.trim(),
+    last_name: $('f-last').value.trim(),
+    nickname: $('f-nickname').value.trim(),
+    emails: splitList($('f-email').value),
+    phones: splitList($('f-phone').value),
+    mobiles: splitList($('f-mobile').value),
+    company: $('f-company').value.trim(),
+    description: $('f-description').value.trim(),
+    notes: $('f-notes').value.trim(),
+    tags: splitList($('f-tags').value)
+  };
+}
+
+// Overlay form values onto target, dropping empty fields to match the Go
+// side's omitempty JSON; fields the form doesn't know (contact_id) survive.
+function applyForm(target, form) {
+  for (const [k, v] of Object.entries(form)) {
+    const empty = Array.isArray(v) ? v.length === 0 : v === '';
+    if (empty) delete target[k];
+    else target[k] = v;
+  }
+  return target;
+}
+
+function commitName(form) {
+  return (form.first_name + ' ' + (form.last_name || '')).trim() || form.company;
+}
+
+async function savePerson() {
+  const form = readForm();
+  if (!form.first_name && !form.company) {
+    setStatus('First name or company is required.', true);
+    return;
+  }
+  setStatus('Saving…');
+  try {
+    let savedId = editingId;
+    if (editingId === null) {
+      await mutate('rp-web: add ' + commitName(form), d => {
+        const p = applyForm({ id: d.next_id }, form);
+        d.next_id++;
+        d.people.push(p);
+        savedId = p.id;
+      });
+    } else {
+      await mutate('rp-web: update ' + commitName(form), d => {
+        const p = d.people.find(x => x.id === editingId);
+        if (!p) throw new Error('Person no longer exists — it may have been deleted on another device.');
+        applyForm(p, form);
+      });
+    }
+    setStatus('Saved.');
+    openDetail(savedId);
+  } catch (err) {
+    setStatus(err.message, true);
+  }
+}
+
+async function deletePerson() {
+  const p = data.people.find(x => x.id === editingId);
+  if (!p || !confirm('Delete ' + displayName(p) + '?')) return;
+  setStatus('Deleting…');
+  try {
+    const id = editingId;
+    await mutate('rp-web: delete ' + displayName(p), d => {
+      d.people = d.people.filter(x => x.id !== id);
+    });
+    setStatus('Deleted.');
+    openList();
+  } catch (err) {
+    setStatus(err.message, true);
+  }
+}
+
+async function sync() {
+  setStatus('Syncing…');
+  try {
+    await pull();
+    setStatus('Synced ' + new Date().toLocaleTimeString() + '.');
+  } catch (err) {
+    setStatus(err.message, true);
+  }
+  if (data) renderList();
+}
+
+// ---------- Setup ----------
+
+function openSetup() {
+  $('cfg-repo').value = cfg ? cfg.repo : '';
+  $('cfg-branch').value = cfg ? cfg.branch : 'main';
+  $('cfg-path').value = cfg ? cfg.path : 'data.json';
+  $('cfg-token').value = cfg ? cfg.token : '';
+  $('btn-forget').classList.toggle('hidden', !cfg);
+  // Back out only when there's a connected list to return to; on first
+  // run (or after Forget) setup is the only view.
+  $('btn-setup-cancel').classList.toggle('hidden', !(cfg && data));
+  show('view-setup');
+}
+
+async function connect() {
+  const candidate = {
+    repo: $('cfg-repo').value.trim(),
+    branch: $('cfg-branch').value.trim() || 'main',
+    path: $('cfg-path').value.trim() || 'data.json',
+    token: $('cfg-token').value.trim()
+  };
+  if (!/^[^/\s]+\/[^/\s]+$/.test(candidate.repo)) {
+    setStatus('Repository must be in owner/name form.', true);
+    return;
+  }
+  if (!candidate.token) {
+    setStatus('An access token is required.', true);
+    return;
+  }
+  cfg = candidate;
+  setStatus('Connecting…');
+  try {
+    await pull();
+    localStorage.setItem(LS_CONFIG, JSON.stringify(cfg));
+    setStatus('Connected.');
+    openList();
+  } catch (err) {
+    cfg = JSON.parse(localStorage.getItem(LS_CONFIG)) || null;
+    setStatus(err.message, true);
+  }
+}
+
+function forget() {
+  if (!confirm('Remove the token and cached data from this device?')) return;
+  localStorage.removeItem(LS_CONFIG);
+  localStorage.removeItem(LS_CACHE);
+  cfg = null;
+  data = null;
+  sha = null;
+  openSetup();
+  setStatus('This device has been disconnected.');
+}
+
+// ---------- Init ----------
+
+$('btn-settings').addEventListener('click', openSetup);
+$('btn-connect').addEventListener('click', connect);
+$('btn-forget').addEventListener('click', forget);
+$('btn-sync').addEventListener('click', sync);
+$('btn-add').addEventListener('click', () => openEdit(null));
+$('btn-save').addEventListener('click', savePerson);
+$('btn-cancel').addEventListener('click', () => {
+  if (editingId !== null) openDetail(editingId);
+  else openList();
+});
+$('btn-delete').addEventListener('click', deletePerson);
+$('btn-edit').addEventListener('click', () => openEdit(detailId));
+$('btn-back').addEventListener('click', openList);
+$('search').addEventListener('input', () => {
+  $('search-clear').classList.toggle('hidden', !$('search').value);
+  renderList();
+});
+$('search-clear').addEventListener('click', () => {
+  $('search').value = '';
+  $('search-clear').classList.add('hidden');
+  renderList();
+  $('search').focus();
+});
+$('btn-filter').addEventListener('click', toggleFilterBar);
+$('btn-select').addEventListener('click', () => setSelectMode(!selectMode));
+$('btn-sel-done').addEventListener('click', () => setSelectMode(false));
+$('btn-sel-all').addEventListener('click', () => {
+  if (allVisibleSelected()) selected.clear();
+  else visiblePeople().forEach(p => selected.add(p.id));
+  renderList();
+});
+$('btn-tag-rename').addEventListener('click', () => renameTag(curTag));
+$('btn-tag-add').addEventListener('click', () => applyTag(curTag, false));
+$('btn-tag-remove').addEventListener('click', () => applyTag(curTag, true));
+$('tag-new').addEventListener('input', () => {
+  curTag = $('tag-new').value.trim();
+  renderList(); // rows re-badge as the tag is typed
+});
+$('tag-new').addEventListener('keydown', e => {
+  if (e.key === 'Enter') applyTag(curTag, false);
+});
+$('btn-setup-cancel').addEventListener('click', openList);
+$('azrail').addEventListener('pointerdown', railStart);
+$('azrail').addEventListener('pointermove', railMove);
+$('azrail').addEventListener('pointerup', railEnd);
+$('azrail').addEventListener('pointercancel', railEnd);
+window.addEventListener?.('resize', setHeaderVar);
+// Re-resolve the layout when the window crosses the phone/desktop breakpoint.
+desktopMQ.addEventListener?.('change', () => { show(currentView); setHeaderVar(); });
+setHeaderVar();
+$('version-note').textContent = 'App version ' + APP_VERSION;
+
+(function start() {
+  try { cfg = JSON.parse(localStorage.getItem(LS_CONFIG)); } catch { cfg = null; }
+  if (!cfg) {
+    openSetup();
+    return;
+  }
+  // Render instantly from the cached copy, then refresh from GitHub.
+  try { data = JSON.parse(localStorage.getItem(LS_CACHE)); } catch { data = null; }
+  if (data) {
+    openList();
+  }
+  sync().then(() => {
+    if (!$('view-edit').classList.contains('hidden')) return;
+    if (!$('view-detail').classList.contains('hidden')) return;
+    if (data) openList();
+    else openSetup();
+  });
+})();
+</script>
+</body>
+</html>
